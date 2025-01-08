@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Log.d(NAVI_ROTATION, "내비 초기화 성공")
 
-                    val intent = Intent(this, NavigationActivity::class.java)
+                    val intent = Intent(this, MapActivity::class.java)
                     startActivity(intent)
                     finish()
                 }
