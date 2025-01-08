@@ -1,15 +1,25 @@
 package com.example.navigationtoyproject
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.navigationtoyproject.databinding.ActivityMapBinding
-import com.example.navigationtoyproject.dto.MapDataDto
+import com.example.navigationtoyproject.api.model.MapDataDto
+import com.example.navigationtoyproject.api.model.NetworkResult
+import com.example.navigationtoyproject.factory.MapViewModelFactory
+import com.example.navigationtoyproject.repository.UserPreferencesRepository
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.kakaomobility.knsdk.KNSDK
@@ -20,8 +30,12 @@ import com.kakaomobility.knsdk.common.util.DoublePoint
 import com.kakaomobility.knsdk.map.knmaprenderer.objects.KNMapCameraUpdate
 import com.kakaomobility.knsdk.map.knmapview.KNMapView
 import com.kakaomobility.knsdk.map.uicustomsupport.renewal.KNMapMarker
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.io.IOException
 
+private const val USER_PREFERENCES_NAME = "user_preferences"
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = USER_PREFERENCES_NAME)
 
 class MapActivity : AppCompatActivity() {
     companion object {
@@ -33,6 +47,9 @@ class MapActivity : AppCompatActivity() {
     private val binding get() = mBinding!!
     private val markerMap = mutableMapOf<Int, KNMapMarker>()
     private var resizedIcon: Bitmap? = null
+
+    private var mapViewModel: MapViewModel? = null
+    private var userPreferencesRepository: UserPreferencesRepository? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,8 +66,53 @@ class MapActivity : AppCompatActivity() {
         val originalIcon = BitmapFactory.decodeResource(resources, R.drawable.signal_light)
         resizedIcon = resizeBitmap(originalIcon!!, ICON_WIDTH, ICON_HEIGHT)
 
+        init()
+
+        mapViewModel?.fetchMapVersion()
+
+        // 첫 번째 collectLatest: NetworkResult 상태 관찰
+        lifecycleScope.launch {
+            mapViewModel?.mapVersionResult?.collectLatest { result ->
+                when (result) {
+                    is NetworkResult.Loading -> {
+                        binding.progressBar.visibility = View.VISIBLE
+                    }
+                    is NetworkResult.Success -> {
+                        binding.progressBar.visibility = View.GONE
+                        val mapVersion = result.data?.mapVersion
+                        if (mapVersion != null) {
+                            mapViewModel?.updateMapVersion(mapVersion)
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        binding.progressBar.visibility = View.GONE
+                    }
+                    else -> {
+                        binding.progressBar.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
+        // 두 번째 collectLatest: DataStore의 mapVersion 관찰
+        lifecycleScope.launch {
+            mapViewModel?.getMapVersionFlow?.collectLatest { mapVersion ->
+                binding.mapVersionTextView.text = "Map Version: $mapVersion"
+            }
+        }
+    }
+
+    private fun init() {
         // 지도 초기화
         initMapView(binding.mapView)
+
+        userPreferencesRepository = UserPreferencesRepository(dataStore)
+
+        // ViewModelFactory 생성
+        val factory = MapViewModelFactory(userPreferencesRepository!!)
+
+        // ViewModelProvider를 통해 ViewModel 인스턴스 얻기
+        mapViewModel = ViewModelProvider(this, factory)[MapViewModel::class.java]
     }
 
     private fun initMapView(mapView: KNMapView) {

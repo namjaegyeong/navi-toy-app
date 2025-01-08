@@ -1,4 +1,4 @@
-package com.example.navigationtoyproject.dto
+package com.example.navigationtoyproject.api.model
 
 data class MapDataDto(
     val customLocationMarkerId: Int,
