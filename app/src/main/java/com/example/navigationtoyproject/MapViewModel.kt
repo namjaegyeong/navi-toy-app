@@ -7,8 +7,7 @@ import com.example.navigationtoyproject.api.model.MapDataListDto
 import com.example.navigationtoyproject.api.model.NetworkResult
 import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,13 +24,13 @@ class MapViewModel(
     private val _mapDataList = MutableStateFlow<NetworkResult<MapDataListDto>?>(null)
     val mapDataList: StateFlow<NetworkResult<MapDataListDto>?> = _mapDataList
 
-    val getMapVersionFlow = repository.getMapVersionFlow
-
     // 맵 버전 정보 API 요청
     fun fetchMapVersion() {
         viewModelScope.launch {
             // 로딩 상태 설정
             _mapVersionResult.value = NetworkResult.Loading()
+
+            delay(3000)
 
             val result = repository.handleApi {
                 apiService.findRecentMapVersion()
@@ -47,17 +46,13 @@ class MapViewModel(
         viewModelScope.launch {
             _mapDataList.value = NetworkResult.Loading()
 
+            delay(3000)
+
             val result = repository.handleApi {
                 apiService.findMapDataList(responseMapVersionDto)
             }
 
             _mapDataList.value = result
-        }
-    }
-
-    fun updateMapVersion(mapVersion: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            repository.updateMapVersion(mapVersion)
         }
     }
 }

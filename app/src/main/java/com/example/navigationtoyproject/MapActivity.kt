@@ -1,8 +1,10 @@
 package com.example.navigationtoyproject
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -15,10 +17,10 @@ import com.example.navigationtoyproject.api.model.MapDataDto
 import com.example.navigationtoyproject.api.model.NetworkResult
 import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
 import com.example.navigationtoyproject.databinding.ActivityMapBinding
+import com.example.navigationtoyproject.datastore.DataStoreHelper
 import com.example.navigationtoyproject.factory.MapViewModelFactory
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.example.navigationtoyproject.service.TerminationService
 import com.kakaomobility.knsdk.KNSDK
 import com.kakaomobility.knsdk.common.gps.KN_DEFAULT_POS_X
 import com.kakaomobility.knsdk.common.gps.KN_DEFAULT_POS_Y
@@ -27,9 +29,10 @@ import com.kakaomobility.knsdk.common.util.DoublePoint
 import com.kakaomobility.knsdk.map.knmaprenderer.objects.KNMapCameraUpdate
 import com.kakaomobility.knsdk.map.knmapview.KNMapView
 import com.kakaomobility.knsdk.map.uicustomsupport.renewal.KNMapMarker
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 class MapActivity : AppCompatActivity() {
     companion object {
@@ -62,36 +65,11 @@ class MapActivity : AppCompatActivity() {
 
         init()
 
-//        mapViewModel?.fetchMapVersion()
-
-        mapViewModel?.findMapDataList(
-            responseMapVersionDto = ResponseMapVersionDto(
-                mapVersion = "1.0.2"
-            )
-        )
-
         // 첫 번째 collectLatest: NetworkResult 상태 관찰
         lifecycleScope.launch {
-//            mapViewModel?.mapVersionResult?.collectLatest { result ->
-//                when (result) {
-//                    is NetworkResult.Loading -> {
-//                        binding.progressBar.visibility = View.VISIBLE
-//                    }
-//                    is NetworkResult.Success -> {
-//                        binding.progressBar.visibility = View.GONE
-//                        val mapVersion = result.data?.mapVersion
-//                        if (mapVersion != null) {
-//                            mapViewModel?.updateMapVersion(mapVersion)
-//                        }
-//                    }
-//                    is NetworkResult.Error -> {
-//                        binding.progressBar.visibility = View.GONE
-//                    }
-//                    else -> {
-//                        binding.progressBar.visibility = View.GONE
-//                    }
-//                }
-//            }
+            delay(3000L)
+
+            checkAndHandleRequestFlag()
 
             mapViewModel?.mapDataList?.collectLatest { result ->
                 when (result) {
@@ -101,9 +79,11 @@ class MapActivity : AppCompatActivity() {
                     is NetworkResult.Success -> {
                         binding.progressBar.visibility = View.GONE
                         val markers = result.data?.mapDataList
+                        val mapVersion = DataStoreHelper.getMapVersion(applicationContext).first() ?: "0.0.0"
                         markers?.forEach { marker ->
                             binding.mapView.addCustomMarker(marker)
                         }
+                        binding.mapVersionTextView.text = "Map Version: $mapVersion"
                     }
                     is NetworkResult.Error -> {
                         binding.progressBar.visibility = View.GONE
@@ -115,19 +95,16 @@ class MapActivity : AppCompatActivity() {
             }
         }
 
-        // 두 번째 collectLatest: DataStore의 mapVersion 관찰
-        lifecycleScope.launch {
-            mapViewModel?.getMapVersionFlow?.collectLatest { mapVersion ->
-                binding.mapVersionTextView.text = "Map Version: $mapVersion"
-            }
-        }
+        // Start the TerminationService
+        val serviceIntent = Intent(this, TerminationService::class.java)
+        startService(serviceIntent)
     }
 
     private fun init() {
         // 지도 초기화
         initMapView(binding.mapView)
 
-        userPreferencesRepository = UserPreferencesRepository(dataStore)
+        userPreferencesRepository = UserPreferencesRepository()
 
         // ViewModelFactory 생성
         val factory = MapViewModelFactory(userPreferencesRepository!!)
@@ -172,6 +149,24 @@ class MapActivity : AppCompatActivity() {
 
     private fun resizeBitmap(source: Bitmap, width: Int, height: Int): Bitmap {
         return Bitmap.createScaledBitmap(source, width, height, true)
+    }
+
+    private suspend fun checkAndHandleRequestFlag() {
+        val requestFlag = DataStoreHelper.getRequestFlag(applicationContext).first() ?: 0
+        if (requestFlag == 1) {
+            Log.d("MainActivity", "Request flag is set to 1. Performing API request.")
+
+            // Perform the desired API request
+            mapViewModel?.findMapDataList(
+                responseMapVersionDto = ResponseMapVersionDto(
+                    mapVersion = DataStoreHelper.getMapVersion(applicationContext).first() ?: "0.0.0"
+                )
+            )
+
+            // Reset the request flag to 0 after handling
+            DataStoreHelper.resetRequestFlag(applicationContext)
+            Log.d("MainActivity", "Request flag reset to 0.")
+        }
     }
 
     override fun onDestroy() {
