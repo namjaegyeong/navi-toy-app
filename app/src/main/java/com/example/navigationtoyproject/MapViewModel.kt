@@ -1,7 +1,9 @@
 package com.example.navigationtoyproject
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.navigationtoyproject.api.di.RetrofitClient.apiService
+import com.example.navigationtoyproject.api.model.MapDataListDto
 import com.example.navigationtoyproject.api.model.NetworkResult
 import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
@@ -19,11 +21,15 @@ class MapViewModel(
     private val _mapVersionResult = MutableStateFlow<NetworkResult<ResponseMapVersionDto>?>(null)
     val mapVersionResult: StateFlow<NetworkResult<ResponseMapVersionDto>?> = _mapVersionResult
 
+    // Backing property for map data list
+    private val _mapDataList = MutableStateFlow<NetworkResult<MapDataListDto>?>(null)
+    val mapDataList: StateFlow<NetworkResult<MapDataListDto>?> = _mapDataList
+
     val getMapVersionFlow = repository.getMapVersionFlow
 
     // 맵 버전 정보 API 요청
     fun fetchMapVersion() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch {
             // 로딩 상태 설정
             _mapVersionResult.value = NetworkResult.Loading()
 
@@ -33,6 +39,19 @@ class MapViewModel(
 
             // result 상태 설정
             _mapVersionResult.value = result
+        }
+    }
+
+    // 맵 데이터 리스트 API 요청
+    fun findMapDataList(responseMapVersionDto: ResponseMapVersionDto) {
+        viewModelScope.launch {
+            _mapDataList.value = NetworkResult.Loading()
+
+            val result = repository.handleApi {
+                apiService.findMapDataList(responseMapVersionDto)
+            }
+
+            _mapDataList.value = result
         }
     }
 

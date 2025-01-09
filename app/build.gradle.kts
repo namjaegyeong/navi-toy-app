@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.knsdk.ui)
     implementation(libs.androidx.datastore.preferences.core)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     testImplementation(libs.junit)

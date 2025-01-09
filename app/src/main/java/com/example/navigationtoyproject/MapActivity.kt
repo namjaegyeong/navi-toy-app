@@ -1,6 +1,5 @@
 package com.example.navigationtoyproject
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -10,14 +9,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.example.navigationtoyproject.databinding.ActivityMapBinding
 import com.example.navigationtoyproject.api.model.MapDataDto
 import com.example.navigationtoyproject.api.model.NetworkResult
+import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
+import com.example.navigationtoyproject.databinding.ActivityMapBinding
 import com.example.navigationtoyproject.factory.MapViewModelFactory
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
 import com.google.gson.Gson
@@ -33,9 +30,6 @@ import com.kakaomobility.knsdk.map.uicustomsupport.renewal.KNMapMarker
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.IOException
-
-private const val USER_PREFERENCES_NAME = "user_preferences"
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = USER_PREFERENCES_NAME)
 
 class MapActivity : AppCompatActivity() {
     companion object {
@@ -68,20 +62,47 @@ class MapActivity : AppCompatActivity() {
 
         init()
 
-        mapViewModel?.fetchMapVersion()
+//        mapViewModel?.fetchMapVersion()
+
+        mapViewModel?.findMapDataList(
+            responseMapVersionDto = ResponseMapVersionDto(
+                mapVersion = "1.0.2"
+            )
+        )
 
         // 첫 번째 collectLatest: NetworkResult 상태 관찰
         lifecycleScope.launch {
-            mapViewModel?.mapVersionResult?.collectLatest { result ->
+//            mapViewModel?.mapVersionResult?.collectLatest { result ->
+//                when (result) {
+//                    is NetworkResult.Loading -> {
+//                        binding.progressBar.visibility = View.VISIBLE
+//                    }
+//                    is NetworkResult.Success -> {
+//                        binding.progressBar.visibility = View.GONE
+//                        val mapVersion = result.data?.mapVersion
+//                        if (mapVersion != null) {
+//                            mapViewModel?.updateMapVersion(mapVersion)
+//                        }
+//                    }
+//                    is NetworkResult.Error -> {
+//                        binding.progressBar.visibility = View.GONE
+//                    }
+//                    else -> {
+//                        binding.progressBar.visibility = View.GONE
+//                    }
+//                }
+//            }
+
+            mapViewModel?.mapDataList?.collectLatest { result ->
                 when (result) {
                     is NetworkResult.Loading -> {
                         binding.progressBar.visibility = View.VISIBLE
                     }
                     is NetworkResult.Success -> {
                         binding.progressBar.visibility = View.GONE
-                        val mapVersion = result.data?.mapVersion
-                        if (mapVersion != null) {
-                            mapViewModel?.updateMapVersion(mapVersion)
+                        val markers = result.data?.mapDataList
+                        markers?.forEach { marker ->
+                            binding.mapView.addCustomMarker(marker)
                         }
                     }
                     is NetworkResult.Error -> {
@@ -131,14 +152,6 @@ class MapActivity : AppCompatActivity() {
                 isVisibleGuideLine = true
                 coordinate = center.toFloatPoint()
             }
-
-            // JSON 데이터 로드 및 파싱
-            val markers = loadMockData()
-
-            // 지도에 마커 추가
-            markers.forEach { marker ->
-                mapView.addCustomMarker(marker)
-            }
         }
     }
 
@@ -155,22 +168,6 @@ class MapActivity : AppCompatActivity() {
             tag = markerId
             this@addCustomMarker.addMarker(this)
         }
-    }
-
-    private fun loadMockData(): List<MapDataDto> {
-        val jsonString: String
-        try {
-            jsonString = assets.open("mock_data.json")
-                .bufferedReader()
-                .use { it.readText() }
-        } catch (ioException: IOException) {
-            ioException.printStackTrace()
-            return emptyList()
-        }
-
-        val gson = Gson()
-        val listMarkerType = object : TypeToken<List<MapDataDto>>() {}.type
-        return gson.fromJson(jsonString, listMarkerType)
     }
 
     private fun resizeBitmap(source: Bitmap, width: Int, height: Int): Bitmap {
