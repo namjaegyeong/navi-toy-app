@@ -7,7 +7,6 @@ import com.example.navigationtoyproject.api.model.MapDataListDto
 import com.example.navigationtoyproject.api.model.NetworkResult
 import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -30,8 +29,6 @@ class MapViewModel(
             // 로딩 상태 설정
             _mapVersionResult.value = NetworkResult.Loading()
 
-            delay(3000)
-
             val result = repository.handleApi {
                 apiService.findRecentMapVersion()
             }
@@ -45,8 +42,6 @@ class MapViewModel(
     fun findMapDataList(responseMapVersionDto: ResponseMapVersionDto) {
         viewModelScope.launch {
             _mapDataList.value = NetworkResult.Loading()
-
-            delay(3000)
 
             val result = repository.handleApi {
                 apiService.findMapDataList(responseMapVersionDto)

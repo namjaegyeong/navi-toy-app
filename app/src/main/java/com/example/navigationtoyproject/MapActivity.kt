@@ -79,9 +79,9 @@ class MapActivity : AppCompatActivity() {
         // 코루틴으로 마커 데이터 처리
         lifecycleScope.launch {
             // 테스트용 목데이터 생성 (필요시 주석 해제)
-            // makeMockData()
+//             makeMockData()
 
-            // 카카오 Map 초기화 완료 대기
+            // 카카오 Map 초기화 전까지 잠시 대기
             delay(3000)
 
             // 맵 버전을 체크하는 서비스 종료 이후, 만약 맵 버전이 최신화되지 않았다면(requestFlag == 1), 최신화된 주제도를 요청
