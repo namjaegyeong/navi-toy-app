@@ -32,7 +32,7 @@ class TerminationService : Service() {
         // Perform your API call here
         performTerminationApiCall()
 
-        Thread.sleep(5000)
+        Thread.sleep(3000)
 
         // Optionally, stop the service
         stopSelf()

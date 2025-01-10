@@ -18,6 +18,9 @@ import com.example.navigationtoyproject.api.model.NetworkResult
 import com.example.navigationtoyproject.api.model.ResponseMapVersionDto
 import com.example.navigationtoyproject.databinding.ActivityMapBinding
 import com.example.navigationtoyproject.datastore.DataStoreHelper
+import com.example.navigationtoyproject.datastore.MapDataMapper
+import com.example.navigationtoyproject.datastore.MapDataMapper.protoListToDtoList
+import com.example.navigationtoyproject.datastore.MapDataStoreManager
 import com.example.navigationtoyproject.factory.MapViewModelFactory
 import com.example.navigationtoyproject.repository.UserPreferencesRepository
 import com.example.navigationtoyproject.service.TerminationService
@@ -65,11 +68,13 @@ class MapActivity : AppCompatActivity() {
 
         init()
 
-        // 첫 번째 collectLatest: NetworkResult 상태 관찰
         lifecycleScope.launch {
-            delay(3000L)
+            delay(3000)
 
             checkAndHandleRequestFlag()
+
+            val mapVersion = DataStoreHelper.getMapVersion(applicationContext).first() ?: "0.0.0"
+            binding.mapVersionTextView.text = "Map Version: $mapVersion"
 
             mapViewModel?.mapDataList?.collectLatest { result ->
                 when (result) {
@@ -78,12 +83,14 @@ class MapActivity : AppCompatActivity() {
                     }
                     is NetworkResult.Success -> {
                         binding.progressBar.visibility = View.GONE
+
                         val markers = result.data?.mapDataList
-                        val mapVersion = DataStoreHelper.getMapVersion(applicationContext).first() ?: "0.0.0"
-                        markers?.forEach { marker ->
-                            binding.mapView.addCustomMarker(marker)
+                        if(markers != null) {
+                            MapDataStoreManager.setMapDataList(this@MapActivity, MapDataMapper.dtoListToProtoList(markers))
+                            markers.forEach { marker ->
+                                binding.mapView.addCustomMarker(marker)
+                            }
                         }
-                        binding.mapVersionTextView.text = "Map Version: $mapVersion"
                     }
                     is NetworkResult.Error -> {
                         binding.progressBar.visibility = View.GONE
@@ -166,7 +173,31 @@ class MapActivity : AppCompatActivity() {
             // Reset the request flag to 0 after handling
             DataStoreHelper.resetRequestFlag(applicationContext)
             Log.d("MainActivity", "Request flag reset to 0.")
+        } else {
+            val markers = MapDataStoreManager.getMapDataList(this@MapActivity).first()
+
+            if(markers != null) {
+                protoListToDtoList(markers.mapDataListList).forEach { marker ->
+                    binding.mapView.addCustomMarker(marker)
+                }
+            }
         }
+    }
+
+    private suspend fun makeMockData() {
+        DataStoreHelper.setMapVersion(applicationContext, "1.0.2")
+
+        val mockList = listOf(
+            MapDataDto(4, 127.456138, 36.629987, "1.0.2"),
+            MapDataDto(5, 127.455806, 36.628351, "1.0.2"),
+            MapDataDto(6, 127.457149, 36.625925, "1.0.2"),
+            MapDataDto(7, 127.452365, 36.628352, "1.0.2"),
+            MapDataDto(8, 127.452166, 36.626559, "1.0.2"),
+            MapDataDto(9, 127.454579, 36.627479, "1.0.2"),
+            MapDataDto(10, 127.455423, 36.626040, "1.0.2")
+        )
+
+        MapDataStoreManager.setMapDataList(this@MapActivity, MapDataMapper.dtoListToProtoList(mockList))
     }
 
     override fun onDestroy() {
